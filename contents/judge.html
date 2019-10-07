@@ -1,0 +1,203 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <title>MNIST判定テスト@S3</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="card mx-auto">
+          <div class="card-header">
+            手書きした数字が何かを判定します
+          </div><!-- ./card-header -->
+
+          <div class="card-body">
+            <div id="handwrite-square-outside" class="col text-center">
+              <canvas id="handwrite-square" width="274%" height="274%" style="border:3px solid #000;"></canvas>
+            </div>
+            <div class="col text-center" style="padding: 15px;">
+              <button type="button" class="btn btn-secondary" onclick="clearCanvas()">リセット</button>
+              <button type="button" class="btn btn-primary" onclick="chgImg()" value="1">決定</button>
+            </div>
+            <div class="col text-center">
+              <div id="img-box"><img id="newImg" width="100%"></div>
+            </div>
+            <div class="col text-center" id="judge" style="display: none;">
+              <form method="post" style="padding: 15px;">
+                <input type="hidden" id="input-image" name="base64_image" value="">
+              </form>
+              <button id="judge-button" class="btn btn-danger">判定</button>
+            </div>
+          </div><!-- ./card-body -->
+          <div class="card-footer">
+            <div id="predict" class="col text-center"></div>
+          </div><!-- ./card-footer -->
+        </div><!-- ./card -->
+      </div><!-- ./row -->
+
+      <div class="row">
+        <a class="mx-auto" href="http://18.223.219.142/"><i class="fas fa-angle-double-left"></i>&nbsp;&nbsp;メニューに戻る</a>
+      </div>
+    </div>
+
+    <script type="text/javascript">
+      // 手書き入力
+      // [参考サイト]https://www.kabanoki.net/934/
+      // [参考サイト]https://mam-mam.net/mytech/show.php?cd=160
+      var can;
+      var ct;
+      var ox=0,oy=0,x=0,y=0;
+      var mf=false;
+
+      // ストレージの初期化
+      var myStorage = localStorage;
+      window.onload = initLocalStorage();
+
+      can=document.getElementById("handwrite-square");
+      can.addEventListener("touchstart",onDown,false);
+      can.addEventListener("touchmove",onMove,false);
+      can.addEventListener("touchend",onUp,false);
+      can.addEventListener("mousedown",onMouseDown,false);
+      can.addEventListener("mousemove",onMouseMove,false);
+      can.addEventListener("mouseup",onMouseUp,false);
+      ct=can.getContext("2d");
+      ct.fillStyle="rgb(255,255,255)";
+      ct.fillRect(0,0,can.getBoundingClientRect().width,can.getBoundingClientRect().height);
+      ct.strokeStyle="rgb(0,0,0)";
+      ct.lineWidth=30;
+      ct.lineJoin="round";
+      ct.lineCap="round";
+
+      function onDown(event){
+        mf=true;
+        ox=event.touches[0].pageX-event.target.getBoundingClientRect().left;
+        oy=event.touches[0].pageY-event.target.getBoundingClientRect().top;
+        event.stopPropagation();
+      }
+
+      function onMove(event){
+        if(mf){
+          x=event.touches[0].pageX-event.target.getBoundingClientRect().left;
+          y=event.touches[0].pageY-event.target.getBoundingClientRect().top;
+          drawLine();
+          ox=x;
+          oy=y;
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
+
+      function onUp(event){
+        mf=false;
+        event.stopPropagation();
+        setLocalStoreage();
+      }
+
+      function onMouseDown(event){
+        ox=event.clientX-event.target.getBoundingClientRect().left;
+        oy=event.clientY-event.target.getBoundingClientRect().top ;
+        mf=true;
+      }
+
+      function onMouseMove(event){
+        if(mf){
+          x=event.clientX-event.target.getBoundingClientRect().left;
+          y=event.clientY-event.target.getBoundingClientRect().top ;
+          drawLine();
+          ox=x;
+          oy=y;
+        }
+      }
+
+      function onMouseUp(event){
+        mf=false;
+        setLocalStoreage();
+      }
+
+      function drawLine(){
+        ct.beginPath();
+        ct.moveTo(ox,oy);
+        ct.lineTo(x,y);
+        ct.stroke();
+      }
+
+      function clearCanvas(){
+        initLocalStorage();
+        ct.fillStyle="rgb(255,255,255)";
+        ct.fillRect(0,0,can.getBoundingClientRect().width,can.getBoundingClientRect().height);
+      }
+
+      function chgImg(){
+        // 28x28に縮小する
+        var resizedCanvas = document.createElement("canvas");
+        var resizedContext = resizedCanvas.getContext("2d");
+        resizedCanvas.height = "28";
+        resizedCanvas.width = "28";
+        resizedContext.drawImage(can, 0, 0, 28, 28);
+        var png = resizedCanvas.toDataURL("image/jpeg");
+      
+        document.getElementById("newImg").src = png;
+        document.getElementById("input-image").value = png;
+        document.getElementById("judge").style.display = "block";
+      }
+
+      function initLocalStorage(){
+        myStorage.setItem("__log", JSON.stringify([]));
+      }
+
+      function setLocalStoreage(){
+        var png = can.toDataURL("image/jpeg");
+        var logs = JSON.parse(myStorage.getItem("__log"));
+      
+        setTimeout(function(){
+          logs.unshift({0:png});
+      
+          myStorage.setItem("__log", JSON.stringify(logs));
+        }, 0);
+      }
+      
+      // 「判定」POSTリクエスト(ajax)
+      $(function(){
+        // 判定 button click
+        $('#judge-button').on('click',function(){
+          var base64_image = $('#input-image').val();
+          var data = JSON.stringify({"base64_image": base64_image});
+          $.ajax({
+            url: 'URL_FOR_API_TO_JUDGE_HANDWRITTEN_NUMBER',
+            type: 'POST',
+            contentType: 'application/json',
+            dataType: 'json',
+            headers: {
+              'x-api-key': 'XXXX',
+            },
+            data: data,
+            beforeSend: function() {
+              $('#judge-button').prop("disabled", true);
+              $("#predict").empty();
+              $("#predict").append("<i class='fas fa-spinner fa-spin'></i>&nbsp;&nbsp;判定中");
+            },
+          })
+          // Ajaxリクエストが成功した時発動
+          .done( (data) => {
+            $("#predict").empty();
+            $("#predict").append("あなたが書いた数字は<h2>" + data.predict + "</h2>ですか？");
+          })
+          // Ajaxリクエストが失敗した時発動
+          .fail( (data) => {
+            $("#predict").empty();
+            $("#predict").append("判定に失敗しました");
+          })
+          // Ajaxリクエストで常に発動
+          .always( (data) => {
+            $('#judge-button').prop("disabled", false);
+          });
+        });
+      });
+    </script>
+
+  </body>
+</html>
