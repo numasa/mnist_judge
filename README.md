@@ -1,5 +1,6 @@
 # 手書き数字判定アプリケーション
 ![mnist_s3_before](https://user-images.githubusercontent.com/55865542/66296926-94bf3280-e929-11e9-97c5-6fc407f046ee.png)
+</br>
 ![mnist_s3_after](https://user-images.githubusercontent.com/55865542/66296947-9db00400-e929-11e9-851c-aad6acffc40a.png)
 
 # AWS上で動作
